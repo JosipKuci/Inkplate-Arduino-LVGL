@@ -91,6 +91,7 @@ int EPDDriver::initDriver(Inkplate *_inkplatePtr)
 
     if (!initializeFramebuffers())
     {
+        Serial.println("Gen LUTS failed");
         return 0;
     }
 
@@ -184,12 +185,13 @@ void EPDDriver::selectDisplayMode(uint8_t displayMode)
 void EPDDriver::clearDisplay()
 {
     // Clear 1 bit per pixel display buffer
-    if (_displayMode == 0)
+    if (_inkplate->getDisplayMode() == 0)
+    {
         memset(_partial, 0, E_INK_WIDTH * E_INK_HEIGHT / 8);
-
+    }
     // Clear 3 bit per pixel display buffer
-    else if (_displayMode == 1)
-        memset(DMemory4Bit, 255, E_INK_WIDTH * E_INK_HEIGHT / 2);
+    else if (_inkplate->getDisplayMode() == 1)
+    memset(DMemory4Bit, 0xFF, E_INK_WIDTH * E_INK_HEIGHT / 2);
 }
 
 /**
@@ -202,11 +204,11 @@ void EPDDriver::clearDisplay()
  */
 void EPDDriver::display(bool _leaveOn)
 {
-    if (_displayMode == 0)
+    if (_inkplate->getDisplayMode() == 0)
     {
         display1b(_leaveOn);
     }
-    else if (_displayMode == 1)
+    else
     {
         display3b(_leaveOn);
     }
@@ -224,21 +226,20 @@ void IRAM_ATTR EPDDriver::display3b(bool leaveOn)
 {
     if (!einkOn())
         return;
-    clean(1, 1);
-    clean(0, 10);
-    clean(2, 1);
-    clean(1, 10);
-    clean(2, 1);
-    clean(0, 10);
-    clean(2, 1);
-    clean(1, 10);
+        clean(1, 1);
+        clean(0, 10);
+        clean(2, 1);
+        clean(1, 10);
+        clean(2, 1);
+        clean(0, 10);
+        clean(2, 1);
+        clean(1, 10);
 
     for (int k = 0; k < 9; k++)
     {
         uint8_t *dp = DMemory4Bit + (E_INK_HEIGHT * E_INK_WIDTH / 2);
 
         vscan_start();
-
         for (int i = 0; i < E_INK_HEIGHT; i++)
         {
             uint32_t t = GLUT2[k * 256 + (*(--dp))];
@@ -834,13 +835,14 @@ uint8_t EPDDriver::initializeFramebuffers()
     if (DMemoryNew == NULL || _partial == NULL || _pBuffer == NULL || DMemory4Bit == NULL || GLUT == NULL ||
         GLUT2 == NULL)
     {
-        return 0;
+       return 0;
     }
     // Set all the framebuffers to White at start
     memset(DMemoryNew, 0, E_INK_WIDTH * E_INK_HEIGHT / 8);
     memset(_partial, 0, E_INK_WIDTH * E_INK_HEIGHT / 8);
     memset(_pBuffer, 0, E_INK_WIDTH * E_INK_HEIGHT / 4);
     memset(DMemory4Bit, 255, E_INK_WIDTH * E_INK_HEIGHT / 2);
+    return 1;
 }
 
 /**
