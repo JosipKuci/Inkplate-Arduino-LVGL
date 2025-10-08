@@ -7,7 +7,7 @@ SdFat sd(&spi2);
 
 /**
  *
- * @brief       writePixelInternal funtion sets pixel data for (x, y) pixel position
+ * @brief       writePixelInternal function sets pixel data for (x, y) pixel position
  *
  * @param       int16_t x0
  *              default position for x, will be changed depending on rotation
@@ -17,48 +17,195 @@ SdFat sd(&spi2);
  *              pixel color, in 3bit mode have values in range 0-7
  *
  * @note        If x0 or y0 are out of inkplate screen borders, function will
- * exit.
+ *              exit.
  */
 void EPDDriver::writePixelInternal(int16_t x, int16_t y, uint16_t color)
 {
-    int16_t x0 = x;
-    int16_t y0 = y;
-    if (x0 > E_INK_WIDTH - 1 || y0 > E_INK_HEIGHT - 1 || x0 < 0 || y0 < 0)
+    if (x < 0 || x >= E_INK_WIDTH || y < 0 || y >= E_INK_HEIGHT)
         return;
 
-    switch (_inkplate->getRotation())
+    int16_t x0 = x;
+    int16_t y0 = y;
+
+    // Cache rotation and display mode
+    uint8_t rotation = _inkplate->getRotation();
+    uint8_t mode = _inkplate->getDisplayMode();
+
+    // Apply rotation
+    switch (rotation)
     {
-    case 1:
-        _swap_int16_t(x0, y0);
-        x0 = E_INK_HEIGHT - x0 - 1;
-        break;
-    case 2:
-        x0 = E_INK_WIDTH - x0 - 1;
-        y0 = E_INK_HEIGHT - y0 - 1;
-        break;
-    case 3:
-        _swap_int16_t(x0, y0);
-        y0 = E_INK_WIDTH - y0 - 1;
-        break;
+        case 1:
+            _swap_int16_t(x0, y0);
+            x0 = E_INK_HEIGHT - x0 - 1;
+            break;
+        case 2:
+            x0 = E_INK_WIDTH - x0 - 1;
+            y0 = E_INK_HEIGHT - y0 - 1;
+            break;
+        case 3:
+            _swap_int16_t(x0, y0);
+            y0 = E_INK_WIDTH - y0 - 1;
+            break;
     }
 
-    if (_inkplate->getDisplayMode() == 0)
+    if (mode == 0)
     {
-        int x = x0 >> 3;
-        int x_sub = x0 & 7;
-        uint8_t temp = *(_partial + ((E_INK_WIDTH >> 3) * y0) + x);
-        *(_partial + (E_INK_WIDTH / 8 * y0) + x) = (~pixelMaskLUT[x_sub] & temp) | (color ? pixelMaskLUT[x_sub] : 0);
+        const int row_offset = (E_INK_WIDTH >> 3) * y0;
+        int byte_index = row_offset + (x0 >> 3);
+        uint8_t mask = pixelMaskLUT[x0 & 7];
+        uint8_t temp = _partial[byte_index];
+        _partial[byte_index] = (temp & ~mask) | (color ? mask : 0);
     }
     else
     {
         color &= 7;
-        int x = x0 >> 1;
-        int x_sub = x0 & 1;
-        uint8_t temp;
-        temp = *(DMemory4Bit + (E_INK_WIDTH >> 1) * y0 + x);
-        *(DMemory4Bit + (E_INK_WIDTH >> 1) * y0 + x) = (pixelMaskGLUT[x_sub] & temp) | (x_sub ? color : color << 4);
+        const int row_offset = (E_INK_WIDTH >> 1) * y0;
+        int byte_index = row_offset + (x0 >> 1);
+        uint8_t temp = DMemory4Bit[byte_index];
+        uint8_t mask = pixelMaskGLUT[x0 & 1];
+        if (x0 & 1)
+            DMemory4Bit[byte_index] = (temp & mask) | color;
+        else
+            DMemory4Bit[byte_index] = (temp & mask) | (color << 4);
     }
 }
+
+void display_flush_callback(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
+{
+    Inkplate *self = static_cast<Inkplate *>(lv_display_get_user_data(disp));
+
+    int32_t w = lv_area_get_width(area);
+    int32_t h = lv_area_get_height(area);
+
+    // Enhanced safety check
+    if (w <= 0 || h <= 0 || px_map == nullptr || 
+        area->x1 < 0 || area->y1 < 0 || 
+        area->x2 >= E_INK_WIDTH || area->y2 >= E_INK_HEIGHT) {
+        lv_display_flush_ready(disp);
+        return;
+    }
+
+    lv_color_format_t cf = lv_display_get_color_format(disp);
+    int32_t stride = lv_disp_get_hor_res(disp); // Fixed function name
+
+    if (self->_ditherEnabled) {
+        std::vector<int16_t> currLine(w);
+        std::vector<int16_t> nextLine(w, 0);
+
+        for (int32_t y = 0; y < h; y++) {
+            int32_t screen_y = area->y1 + y;
+            
+            for (int32_t x = 0; x < w; x++) {
+                int32_t screen_x = area->x1 + x;
+                
+                // Safe pixel access using LVGL's recommended method
+                uint32_t px_index = screen_y * stride + screen_x;
+                
+                // Additional bounds check
+                if (px_index < (uint32_t)(stride * lv_disp_get_ver_res(disp))) {
+                    currLine[x] = px_map[px_index] + nextLine[x];
+                } else {
+                    currLine[x] = nextLine[x];
+                }
+                nextLine[x] = 0;
+            }
+
+            for (int32_t x = 0; x < w; x++) {
+                int32_t screen_x = area->x1 + x;
+                int32_t screen_y = area->y1 + y;
+                
+                // Clamp pixel value - FIXED: use same types
+                int16_t pixel_val = currLine[x];
+                if (pixel_val < 0) pixel_val = 0;
+                if (pixel_val > 255) pixel_val = 255;
+                int oldpixel = pixel_val;
+                
+                int newpixel, newval, error;
+
+                if (self->getDisplayMode() == INKPLATE_3BIT) {
+                    newpixel = oldpixel >> 5;
+                    newval = newpixel << 5;
+                    error = oldpixel - newval;
+                    
+                    // Safe drawPixel call
+                    if (screen_x >= 0 && screen_x < E_INK_WIDTH && 
+                        screen_y >= 0 && screen_y < E_INK_HEIGHT) {
+                        self->drawPixel(screen_x, screen_y, newpixel);
+                    }
+                } else {
+                    // 1-bit mode
+                    newpixel = (oldpixel < 128) ? 1 : 0;
+                    newval = newpixel ? 0 : 255;
+                    error = oldpixel - newval;
+                    
+                    if (screen_x >= 0 && screen_x < E_INK_WIDTH && 
+                        screen_y >= 0 && screen_y < E_INK_HEIGHT) {
+                        self->drawPixel(screen_x, screen_y, newpixel);
+                    }
+                }
+
+                // Error diffusion with manual clamping (no std::min/max)
+                if (x + 1 < w) {
+                    int new_val = currLine[x + 1] + (error * 7) / 16;
+                    if (new_val < -255) new_val = -255;
+                    if (new_val > 510) new_val = 510;
+                    currLine[x + 1] = new_val;
+                }
+                if (y + 1 < h) {
+                    if (x > 0) {
+                        int new_val = nextLine[x - 1] + (error * 3) / 16;
+                        if (new_val < -255) new_val = -255;
+                        if (new_val > 510) new_val = 510;
+                        nextLine[x - 1] = new_val;
+                    }
+                    int new_val = nextLine[x] + (error * 5) / 16;
+                    if (new_val < -255) new_val = -255;
+                    if (new_val > 510) new_val = 510;
+                    nextLine[x] = new_val;
+                    if (x + 1 < w) {
+                        int new_val2 = nextLine[x + 1] + (error * 1) / 16;
+                        if (new_val2 < -255) new_val2 = -255;
+                        if (new_val2 > 510) new_val2 = 510;
+                        nextLine[x + 1] = new_val2;
+                    }
+                }
+            }
+        }
+    } else {
+        // No dithering - with enhanced safety
+        for (int32_t y = 0; y < h; y++) {
+            int32_t screen_y = area->y1 + y;
+            for (int32_t x = 0; x < w; x++) {
+                int32_t screen_x = area->x1 + x;
+                
+                uint32_t px_index = screen_y * stride + screen_x;
+                
+                if (px_index < (uint32_t)(stride * lv_disp_get_ver_res(disp))) {
+                    uint8_t gray_val = px_map[px_index];
+                    
+                    if (self->getDisplayMode() == INKPLATE_3BIT) {
+                        uint8_t gray3 = gray_val >> 5;
+                        if (screen_x >= 0 && screen_x < E_INK_WIDTH && 
+                            screen_y >= 0 && screen_y < E_INK_HEIGHT) {
+                            self->drawPixel(screen_x, screen_y, gray3);
+                        }
+                    } else {
+                        // 1-bit mode
+                        uint8_t bit = (gray_val < 128) ? 1 : 0;
+                        if (screen_x >= 0 && screen_x < E_INK_WIDTH && 
+                            screen_y >= 0 && screen_y < E_INK_HEIGHT) {
+                            self->drawPixel(screen_x, screen_y, bit);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    lv_display_flush_ready(disp);
+}
+
+
 
 
 /**
@@ -81,9 +228,6 @@ int EPDDriver::initDriver(Inkplate *_inkplatePtr)
 
     // Save the given inkplate pointer for internal use
     _inkplate = _inkplatePtr;
-
-    // Initialize the image processing functionalities
-    beginImage(_inkplatePtr);
 
     // Initialize the all GPIOs
     gpioInit();

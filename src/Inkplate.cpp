@@ -19,13 +19,21 @@
 
 #include "Inkplate.h"
 
-//--------------------------USER FUNCTIONS--------------------------------------------
-Inkplate::Inkplate(uint8_t mode) : Adafruit_GFX(E_INK_WIDTH, E_INK_HEIGHT), Graphics(E_INK_WIDTH, E_INK_HEIGHT)
+Inkplate::Inkplate(uint8_t mode) 
 {
     _mode = mode;
 }
 
-void Inkplate::begin()
+/**
+ *
+ * @brief       begin function initializes the EPDdriver as well as the lvgl library
+ *
+ * @param       lv_display_render_mode_t renderMode - sets what render mode will be used to draw inside the framebuffer
+ *              options: LV_DISP_RENDER_MODE_FULL (default), LV_DISP_RENDER_MODE_DIRECT, LV_DISP_RENDER_MODE_PARTIAL
+ *
+ * @note        If the begin function was already called, skip the initialization
+ */
+void Inkplate::begin(lv_display_render_mode_t renderMode)
 {
 
     // Check if the initializaton of the library already done.
@@ -36,8 +44,13 @@ void Inkplate::begin()
 
     Wire.begin();
 
+    _renderMode = renderMode;
+
     // Init low level driver for EPD.
     initDriver(this);
+
+    initLVGL(renderMode);
+
 
     // Forward the display mode to the EPD driver
     selectDisplayMode(_mode);
@@ -49,6 +62,17 @@ void Inkplate::begin()
     _beginDone = 1;
 }
 
+/**
+ *
+ * @brief       drawPixel function draws a pixel at a specific coordinate on the screen with a specific color value
+ *
+ * @param       int16_t x0
+ *              default position for x, will be changed depending on rotation
+ * @param       int16_t y0
+ *              default position for y, will be changed depending on rotation
+ * @param       uint16_t color
+ *              pixel color, in 3bit mode have values in range 0-7
+ */
 void Inkplate::drawPixel(int16_t x, int16_t y, uint16_t color)
 {
     writePixel(x, y, color);
@@ -61,8 +85,8 @@ void Inkplate::writePixel(int16_t x, int16_t y, uint16_t color)
 
 void Inkplate::setRotation(uint8_t r)
 {
-    rotation = (r & 3);
-    switch (rotation)
+    _rotation = (r & 3);
+    switch (_rotation)
     {
     case 0:
     case 2:
@@ -75,4 +99,76 @@ void Inkplate::setRotation(uint8_t r)
         _height = E_INK_WIDTH;
         break;
     }
+}
+
+uint8_t Inkplate::getRotation()
+{
+    return _rotation;
+}
+
+
+void Inkplate::initLVGL(lv_display_render_mode_t renderMode)
+{
+    Serial.println("Initializing LVGL...");
+    
+    // Init the lvgl library itself
+    lv_init();
+
+    // Define display resolution
+    uint32_t screen_width = E_INK_WIDTH;
+    uint32_t screen_height = E_INK_HEIGHT;
+    uint32_t buffer_size;
+    lv_color_t* buf_1;
+    lv_color_t* buf_2;
+
+    if(renderMode == LV_DISPLAY_RENDER_MODE_PARTIAL){
+        #define PARTIAL_ROWS 16
+        buf_1=(lv_color_t*)heap_caps_malloc( screen_width * PARTIAL_ROWS, MALLOC_CAP_8BIT );
+        buf_2= (lv_color_t*)heap_caps_malloc( screen_width * PARTIAL_ROWS, MALLOC_CAP_8BIT );
+        buffer_size = screen_width*PARTIAL_ROWS;
+    }
+    else
+    {
+        buf_1=(lv_color_t*)heap_caps_malloc( screen_width * screen_height, MALLOC_CAP_8BIT );
+        buf_2= (lv_color_t*)heap_caps_malloc( screen_width * screen_height, MALLOC_CAP_8BIT );
+        buffer_size = screen_width*screen_height;
+    }
+
+    // Create a display driver instance
+    disp = lv_display_create(screen_width, screen_height);
+    if(disp == NULL) {
+        Serial.println("ERROR: Failed to create LVGL display!");
+        return;
+    }
+
+    lv_display_set_default(disp);
+
+    // Use 8-bit grayscale
+    lv_display_set_color_format(disp, LV_COLOR_FORMAT_L8);
+
+    // Calculate buffer size
+    Serial.println("Setting buffer size: " + String(buffer_size) + " bytes");
+
+    // Attach the buffer
+    lv_display_set_buffers(
+        disp,
+        buf_1,
+        buf_2,
+        buffer_size,
+        renderMode
+    );
+
+    // Store this Inkplate instance
+    lv_display_set_user_data(disp, this);
+
+    // Set flush callback
+    lv_display_set_flush_cb(disp, display_flush_callback);
+
+    Serial.println("LVGL initialization complete");
+    
+}
+
+void Inkplate::enableDithering(bool state)
+{
+    _ditherEnabled = state;
 }

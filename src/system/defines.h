@@ -39,6 +39,7 @@
 #define PWR_GOOD_OK            0b11111010
 #define INKPLATE_FORCE_PARTIAL true
 
+
 #ifndef _swap_int16_t
 #define _swap_int16_t(a, b)                                                                                            \
     {                                                                                                                  \

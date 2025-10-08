@@ -18,8 +18,6 @@
 // Include waveforms for EPD
 #include "waveforms.h"
 
-#include "../../graphics/Image/Image.h"
-
 #include "Wire.h"
 
 #include "../../graphics/GraphicsDefs.h"
@@ -32,7 +30,7 @@
 class Inkplate;
 
 
-class EPDDriver : public Image
+class EPDDriver
 {
   public:
     void writePixelInternal(int16_t x, int16_t y, uint16_t color);
