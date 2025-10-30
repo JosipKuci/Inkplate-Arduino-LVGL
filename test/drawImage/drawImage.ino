@@ -15,7 +15,7 @@ Distributed as-is; no warranty is given.
 */
 
 
-#include "Inkplate.h"
+#include "Inkplate-LVGL.h"
 
 #ifdef ARDUINO_ESP32_DEV
 #include "img.h"

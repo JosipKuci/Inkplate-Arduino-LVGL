@@ -3,7 +3,7 @@
 #error "Please select Inkplate 6COLOR from board selection"
 #endif
 
-#include "Inkplate.h"
+#include "Inkplate-LVGL.h"
 #include "SdFat.h"
 
 Inkplate display;

@@ -22,7 +22,7 @@
 #endif
 
 #include "HTTPClient.h"          //Include library for HTTPClient
-#include "Inkplate.h"            //Include Inkplate library to the sketch
+#include "Inkplate-LVGL.h"            //Include Inkplate library to the sketch
 #include "WiFi.h"                //Include library for WiFi
 Inkplate display(INKPLATE_1BIT); // Create an object on Inkplate library and also set library into 1 Bit mode (BW)
 

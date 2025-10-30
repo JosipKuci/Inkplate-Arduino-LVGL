@@ -1,4 +1,4 @@
-#include "Inkplate.h"
+#include "Inkplate-LVGL.h"
 
 Inkplate display(INKPLATE_1BIT);
 

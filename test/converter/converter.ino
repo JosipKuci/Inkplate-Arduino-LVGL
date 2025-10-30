@@ -1,4 +1,4 @@
-#include "Inkplate.h"
+#include "Inkplate-LVGL.h"
 #include "img_new_dither.h"
 
 Inkplate display;

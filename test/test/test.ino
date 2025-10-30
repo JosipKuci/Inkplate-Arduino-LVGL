@@ -5,7 +5,7 @@
 */
 
 #include "HTTPClient.h"          //Include library for HTTPClient
-#include "Inkplate.h"            //Include Inkplate library to the sketch
+#include "Inkplate-LVGL.h"            //Include Inkplate library to the sketch
 #include "WiFi.h"                //Include library for WiFi
 #include "driver/rtc_io.h"       // Include ESP32 library for RTC pin I/O (needed for rtc_gpio_isolate() function)
 #include <rom/rtc.h>             // Include ESP32 library for RTC (needed for rtc_get_reset_reason() function)
