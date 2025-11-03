@@ -4,5 +4,13 @@
 #ifdef ARDUINO_INKPLATE10V2
 #include "SdFat/SdFat.h"
 #include "rtc/rtc.h"
+#elif defined(ARDUINO_INKPLATE6V2)
+#include "SdFat/SdFat.h"
+#include "rtc/rtc.h"
+#elif defined(ARDUINO_INKPLATE6FLICK)
+#include "SdFat/SdFat.h"
+#include "rtc/rtc.h"
+#include "touchscreen/touchCypress/TouchCypress.h"
+#include "frontlight/Frontlight.h"
 #endif
 #endif

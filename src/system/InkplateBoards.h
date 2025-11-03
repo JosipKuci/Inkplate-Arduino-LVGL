@@ -17,6 +17,10 @@
 // Board selector. It only includes files for selected board.
 #ifdef ARDUINO_INKPLATE10V2
 #include "../boards/Inkplate10/Inkplate10Driver.h"
+#elif defined(ARDUINO_INKPLATE6V2)
+#include "boards/Inkplate6/Inkplate6Driver.h"
+#elif defined(ARDUINO_INKPLATE6FLICK)
+#include "boards/Inkplate6FLICK/Inkplate6FLICKDriver.h"
 #endif
 
 #endif

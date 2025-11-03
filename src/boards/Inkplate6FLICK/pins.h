@@ -1,7 +1,6 @@
-#ifndef __INKPLATE10V2_PINS_H__
-#define __INKPLATE10V2_PINS_H__
-// Board select check.
-#ifdef ARDUINO_INKPLATE10V2
+#ifndef __INKPLATE6FLICK_PINS_H__
+#define __INKPLATE6FLICK_PINS_H__
+#ifdef ARDUINO_INKPLATE6FLICK
 #include "soc/gpio_reg.h"
 #include "soc/gpio_struct.h"
 #define IO_INT_ADDR 0x20
@@ -9,6 +8,16 @@
 
 // Pin on the internal io expander which controls MOSFET for turning on and off the SD card
 #define SD_PMOS_PIN IO_PIN_B2 // 10
+
+// Touchscreen defines
+#define TOUCHSCREEN_EN          IO_PIN_B4
+#define TOUCHSCREEN_RST                  IO_PIN_B2
+#define TOUCHSCREEN_INT                  36
+#define TOUCHSCREEN_IO_EXPANDER IO_INT_ADDR
+#define TOUCHSCREEN_IO_REGS     ioRegsInt
+
+// Frontlight
+#define FRONTLIGHT_EN 11
 
 #define WAKEUP 3
 #define WAKEUP_SET                                                                                                     \

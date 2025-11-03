@@ -17,7 +17,8 @@
  ***************************************************/
 
 #include "Esp.h"
-
+#include "../../boardSelect.h"
+#ifdef USES_I2S
 /**
  * @brief       Function Intializes I2S driver of the ESP32
  *
@@ -225,3 +226,4 @@ void IRAM_ATTR setI2S1pin(uint32_t _pin, uint32_t _function, uint32_t _inv)
     ESP_REG(io_mux[_pin]) = 0;
     ESP_REG(io_mux[_pin]) = ((3 << FUN_DRV_S) | (2 << MCU_SEL_S));
 }
+#endif

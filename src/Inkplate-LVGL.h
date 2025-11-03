@@ -41,7 +41,7 @@ class Inkplate : public InkplateBoardClass, public NetworkController
     void enableDithering(bool state);
     uint8_t getRotation();
     lv_display_t *disp;
-    bool _ditherEnabled = false;
+    bool ditherEnabled = false;
     lv_display_render_mode_t _renderMode;
 
 

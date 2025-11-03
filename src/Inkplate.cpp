@@ -17,7 +17,7 @@
  * @authors     @ Soldered
  ***************************************************/
 
-#include "Inkplate.h"
+#include "Inkplate-LVGL.h"
 
 Inkplate::Inkplate(uint8_t mode) 
 {
@@ -146,8 +146,6 @@ void Inkplate::initLVGL(lv_display_render_mode_t renderMode)
     // Use 8-bit grayscale
     lv_display_set_color_format(disp, LV_COLOR_FORMAT_L8);
 
-    // Calculate buffer size
-    Serial.println("Setting buffer size: " + String(buffer_size) + " bytes");
 
     // Attach the buffer
     lv_display_set_buffers(
@@ -170,5 +168,5 @@ void Inkplate::initLVGL(lv_display_render_mode_t renderMode)
 
 void Inkplate::enableDithering(bool state)
 {
-    _ditherEnabled = state;
+    ditherEnabled = state;
 }

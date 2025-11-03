@@ -1,7 +1,6 @@
-#ifndef __INKPLATE10V2_PINS_H__
-#define __INKPLATE10V2_PINS_H__
-// Board select check.
-#ifdef ARDUINO_INKPLATE10V2
+#ifndef __INKPLATE6V2_PINS_H__
+#define __INKPLATE6V2_PINS_H__
+#ifdef ARDUINO_INKPLATE6V2
 #include "soc/gpio_reg.h"
 #include "soc/gpio_struct.h"
 #define IO_INT_ADDR 0x20

@@ -17,6 +17,13 @@
 
 #ifdef ARDUINO_INKPLATE10V2
 #include "boards/Inkplate10/Inkplate10BoardFile.h"
+#elif defined(ARDUINO_INKPLATE6V2)
+#define USES_I2S
+#include "boards/Inkplate6/Inkplate6BoardFile.h"
+#elif defined(ARDUINO_INKPLATE6FLICK)
+#define USES_I2S
+#define MULTIPLE_DISPLAY_MODES
+#include "boards/Inkplate6FLICK/Inkplate6FLICKBoardFile.h"
 #else
 #error "Board not selected!"
 #endif
