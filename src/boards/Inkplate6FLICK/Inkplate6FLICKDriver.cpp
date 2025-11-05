@@ -5,191 +5,115 @@
 SPIClass spi2(2);
 SdFat sd(&spi2);
 
+
 /**
+ * @brief       display_flush_callback function is called whenever there is a change made on the current 
+ *              LVGL screen. The data is downscaled to 3 bit or 1 bit grayscale depending on the current display mode
+ *              and stored in the EPD buffer for rendering
  *
- * @brief       writePixelInternal funtion sets pixel data for (x, y) pixel position
- *
- * @param       int16_t x0
- *              default position for x, will be changed depending on rotation
- * @param       int16_t y0
- *              default position for y, will be changed depending on rotation
- * @param       uint16_t color
- *              pixel color, in 3bit mode have values in range 0-7
- *
- * @note        If x0 or y0 are out of inkplate screen borders, function will
- * exit.
+ * @param       lv_display_t *disp
+ *              A pointer to the created LVGL display instance
+ * 
+ * @param       lv_area_t *area
+ *              A pointer to the area of the display which has changed
+ * 
+ * @param       uint8_t px_map
+ *              An array of pixel values in L8 format
+ * 
  */
-void EPDDriver::writePixelInternal(int16_t x, int16_t y, uint16_t color)
-{
-    int16_t x0 = x;
-    int16_t y0 = y;
-    if (x0 > E_INK_WIDTH - 1 || y0 > E_INK_HEIGHT - 1 || x0 < 0 || y0 < 0)
-        return;
-
-    // set x, y depending on selected rotation
-    switch (_inkplate->getRotation())
-    {
-    case 1: // 90 degree left
-        _swap_int16_t(x0, y0);
-        x0 = E_INK_HEIGHT - x0 - 1;
-        break;
-    case 2: // 180 degree, or upside down
-        x0 = E_INK_WIDTH - x0 - 1;
-        y0 = E_INK_HEIGHT - y0 - 1;
-        break;
-    case 3: // 90 degree right
-        _swap_int16_t(x0, y0);
-        y0 = E_INK_WIDTH - y0 - 1;
-        break;
-    }
-
-    if (_inkplate->getDisplayMode() == 0)
-    {
-        int x = x0 / 8;
-        int x_sub = x0 % 8;
-        uint8_t temp = *(_partial + (E_INK_WIDTH / 8 * y0) + x); // DMemoryNew[99 * y0 + x];
-        *(_partial + (E_INK_WIDTH / 8 * y0) + x) = (~pixelMaskLUT[x_sub] & temp) | (color ? pixelMaskLUT[x_sub] : 0);
-    }
-    else
-    {
-        color &= 7;
-        int x = x0 / 2;
-        int x_sub = x0 % 2;
-        uint8_t temp;
-        temp = *(DMemory4Bit + E_INK_WIDTH / 2 * y0 + x);
-        *(DMemory4Bit + E_INK_WIDTH / 2 * y0 + x) = (pixelMaskGLUT[x_sub] & temp) | (x_sub ? color : color << 4);
-    }
-}
-
-
-
-void display_flush_callback(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
+void IRAM_ATTR display_flush_callback(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
 {
     Inkplate *self = static_cast<Inkplate *>(lv_display_get_user_data(disp));
 
     int32_t w = lv_area_get_width(area);
     int32_t h = lv_area_get_height(area);
 
-    // Enhanced safety check
-    if (w <= 0 || h <= 0 || px_map == nullptr || 
-        area->x1 < 0 || area->y1 < 0 || 
-        area->x2 >= E_INK_WIDTH || area->y2 >= E_INK_HEIGHT) {
+    if (w <= 0 || h <= 0 || px_map == nullptr ||
+        area->x1 < 0 || area->y1 < 0 ||
+        area->x2 >= E_INK_WIDTH || area->y2 >= E_INK_HEIGHT)
+    {
         lv_display_flush_ready(disp);
         return;
     }
 
-    lv_color_format_t cf = lv_display_get_color_format(disp);
-    int32_t stride = lv_disp_get_hor_res(disp); // Fixed function name
+    bool is3bit = (self->getDisplayMode() == INKPLATE_3BIT);
 
-    if (self->ditherEnabled) {
-        std::vector<int16_t> currLine(w);
-        std::vector<int16_t> nextLine(w, 0);
+    uint8_t *buffer1b = self->_partial;
+    uint8_t *buffer3b = self->DMemory4Bit;
 
-        for (int32_t y = 0; y < h; y++) {
-            int32_t screen_y = area->y1 + y;
-            
-            for (int32_t x = 0; x < w; x++) {
+    const int width_bytes_1b = E_INK_WIDTH / 8;
+    const int width_bytes_3b = E_INK_WIDTH / 2;
+
+    // Preload LUTs to local for faster access
+    const uint8_t *maskLUT  = pixelMaskLUT;
+    const uint8_t *maskGLUT = pixelMaskGLUT;
+
+    for (int32_t y = 0; y < h; y++)
+    {
+        int32_t screen_y = area->y1 + y;
+        const uint8_t *src_row = px_map + (y * w);
+
+        if (is3bit)
+        {
+            uint8_t *dst_row = buffer3b + (width_bytes_3b * screen_y);
+
+            for (int32_t x = 0; x < w; x++)
+            {
                 int32_t screen_x = area->x1 + x;
-                
-                uint32_t px_index = y * w + x;
-                currLine[x] = px_map[px_index] + nextLine[x];
+                if (screen_x >= E_INK_WIDTH) break;
 
-                nextLine[x] = 0;
-            }
+                uint8_t gray3 = src_row[x] >> 5;
+                int x_byte = screen_x / 2;
+                int x_sub  = screen_x % 2;
 
-            for (int32_t x = 0; x < w; x++) {
-                int32_t screen_x = area->x1 + x;
-                int32_t screen_y = area->y1 + y;
-                
-                // Clamp pixel value - FIXED: use same types
-                int16_t pixel_val = currLine[x];
-                if (pixel_val < 0) pixel_val = 0;
-                if (pixel_val > 255) pixel_val = 255;
-                int oldpixel = pixel_val;
-                
-                int newpixel, newval, error;
+                uint8_t temp = dst_row[x_byte];
+                uint8_t newv = (maskGLUT[x_sub] & temp) |
+                               (x_sub ? gray3 : (gray3 << 4));
 
-                if (self->getDisplayMode() == INKPLATE_3BIT) {
-                    newpixel = oldpixel >> 5;
-                    newval = newpixel << 5;
-                    error = oldpixel - newval;
-                    
-                    // Safe drawPixel call
-                    if (screen_x >= 0 && screen_x < E_INK_WIDTH && 
-                        screen_y >= 0 && screen_y < E_INK_HEIGHT) {
-                        self->drawPixel(screen_x, screen_y, newpixel);
-                    }
-                } else {
-                    // 1-bit mode
-                    newpixel = (oldpixel < 128) ? 1 : 0;
-                    newval = newpixel ? 0 : 255;
-                    error = oldpixel - newval;
-                    
-                    if (screen_x >= 0 && screen_x < E_INK_WIDTH && 
-                        screen_y >= 0 && screen_y < E_INK_HEIGHT) {
-                        self->drawPixel(screen_x, screen_y, newpixel);
-                    }
-                }
-
-                // Error diffusion with manual clamping (no std::min/max)
-                if (x + 1 < w) {
-                    int new_val = currLine[x + 1] + (error * 7) / 16;
-                    if (new_val < -255) new_val = -255;
-                    if (new_val > 510) new_val = 510;
-                    currLine[x + 1] = new_val;
-                }
-                if (y + 1 < h) {
-                    if (x > 0) {
-                        int new_val = nextLine[x - 1] + (error * 3) / 16;
-                        if (new_val < -255) new_val = -255;
-                        if (new_val > 510) new_val = 510;
-                        nextLine[x - 1] = new_val;
-                    }
-                    int new_val = nextLine[x] + (error * 5) / 16;
-                    if (new_val < -255) new_val = -255;
-                    if (new_val > 510) new_val = 510;
-                    nextLine[x] = new_val;
-                    if (x + 1 < w) {
-                        int new_val2 = nextLine[x + 1] + (error * 1) / 16;
-                        if (new_val2 < -255) new_val2 = -255;
-                        if (new_val2 > 510) new_val2 = 510;
-                        nextLine[x + 1] = new_val2;
-                    }
-                }
+                dst_row[x_byte] = newv;
             }
         }
-    } else {
-        // No dithering
-        for (int32_t y = 0; y < h; y++) {
-            int32_t screen_y = area->y1 + y;
-            for (int32_t x = 0; x < w; x++) {
+        else
+        {
+            uint8_t *dst_row = buffer1b + (width_bytes_1b * screen_y);
+
+            for (int32_t x = 0; x < w; x++)
+            {
                 int32_t screen_x = area->x1 + x;
-                
-                uint32_t px_index = screen_y * stride + screen_x;
-                
-                if (px_index < (uint32_t)(stride * lv_disp_get_ver_res(disp))) {
-                    uint8_t gray_val = px_map[px_index];
-                    
-                    if (self->getDisplayMode() == INKPLATE_3BIT) {
-                        uint8_t gray3 = gray_val >> 5;
-                        if (screen_x >= 0 && screen_x < E_INK_WIDTH && 
-                            screen_y >= 0 && screen_y < E_INK_HEIGHT) {
-                            self->drawPixel(screen_x, screen_y, gray3);
-                        }
-                    } else {
-                        // 1-bit mode
-                        uint8_t bit = (gray_val < 128) ? 1 : 0;
-                        if (screen_x >= 0 && screen_x < E_INK_WIDTH && 
-                            screen_y >= 0 && screen_y < E_INK_HEIGHT) {
-                            self->drawPixel(screen_x, screen_y, bit);
-                        }
-                    }
-                }
+                if (screen_x >= E_INK_WIDTH) break;
+
+                uint8_t gray = src_row[x];
+                uint8_t bit = (gray < 128) ? 1 : 0;
+
+                int x_byte = screen_x / 8;
+                int x_sub  = screen_x % 8;
+
+                uint8_t temp = dst_row[x_byte];
+                // Preserve other bits using original mask logic
+                dst_row[x_byte] = (~maskLUT[x_sub] & temp) |
+                                  (bit ? maskLUT[x_sub] : 0);
             }
         }
     }
 
     lv_display_flush_ready(disp);
+}
+
+
+
+// Touchscreen read callback
+void touchscreen_read(lv_indev_t * indev, lv_indev_data_t * data) {
+lv_display_t *disp = (lv_display_t*) lv_indev_get_display(indev);
+Inkplate *self = static_cast<Inkplate *>(lv_display_get_user_data(disp));
+  if (self->touchscreen.available()) {
+    uint16_t x, y;
+    self->touchscreen.getData(&x, &y);
+    data->state = LV_INDEV_STATE_PRESSED;
+    data->point.x = x;
+    data->point.y = y;
+  } else {
+    data->state = LV_INDEV_STATE_RELEASED;
+  }
 }
 
 
@@ -223,6 +147,10 @@ int EPDDriver::initDriver(Inkplate *_inkplatePtr)
     touchscreen.begin(_inkplatePtr);
 
     frontlight.begin(_inkplatePtr);
+
+    lv_indev_t * indev = lv_indev_create();
+    lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER);
+    lv_indev_set_read_cb(indev, touchscreen_read);
 
     // Use only myI2S
     myI2S = &I2S1;

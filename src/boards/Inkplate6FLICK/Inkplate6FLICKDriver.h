@@ -36,9 +36,8 @@ class Inkplate;
 class EPDDriver : public Esp
 {
   public:
-    void writePixelInternal(int16_t x, int16_t y, uint16_t color);
     int initDriver(Inkplate *_inkplatePtr);
-
+    void IRAM_ATTR writePixelInternal(int16_t x, int16_t y, uint16_t color);
     void display(bool _leaveOn = 0);
     void selectDisplayMode(uint8_t displayMode);
     void clearDisplay();
