@@ -102,11 +102,6 @@ static void img_draw_core(lv_draw_task_t * t, const lv_draw_image_dsc_t * draw_d
     lv_area_move(&buffer_area, x, y);
     lv_area_move(&clipped_area, x, y);
 
-    /* Generate render operations*/
-#if D2_RENDER_EACH_OPERATION
-    d2_selectrenderbuffer(u->d2_handle, u->renderbuffer);
-#endif
-
     current_fill_mode = d2_getfillmode(u->d2_handle);
     a_texture_op      = d2_gettextureoperationa(u->d2_handle);
     r_texture_op      = d2_gettextureoperationr(u->d2_handle);
@@ -115,8 +110,8 @@ static void img_draw_core(lv_draw_task_t * t, const lv_draw_image_dsc_t * draw_d
     src_blend_mode    = d2_getblendmodesrc(u->d2_handle);
     dst_blend_mode    = d2_getblendmodedst(u->d2_handle);
 
-#if defined(RENESAS_CORTEX_M85)
-#if (BSP_CFG_DCACHE_ENABLED)
+#if defined(RENESAS_CORTEX_M85) || defined(_RENESAS_RZA_)
+#if (BSP_CFG_DCACHE_ENABLED) || defined(_RENESAS_RZA_)
     d1_cacheblockflush(u->d2_handle, 0, src_buf,
                        img_stride * header->h); //Stride is in bytes, not pixels/texels
 #endif
@@ -301,14 +296,6 @@ static void img_draw_core(lv_draw_task_t * t, const lv_draw_image_dsc_t * draw_d
                   (d2_point)D2_FIX4(p[3].x),
                   (d2_point)D2_FIX4(p[3].y),
                   0);
-
-    //
-    // Execute render operations
-    //
-#if D2_RENDER_EACH_OPERATION
-    d2_executerenderbuffer(u->d2_handle, u->renderbuffer, 0);
-    d2_flushframe(u->d2_handle);
-#endif
 
     d2_setfillmode(u->d2_handle, current_fill_mode);
     d2_settextureoperation(u->d2_handle, a_texture_op, r_texture_op, g_texture_op, b_texture_op);

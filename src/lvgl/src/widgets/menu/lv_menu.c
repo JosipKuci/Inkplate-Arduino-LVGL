@@ -81,18 +81,22 @@ const lv_obj_class_t lv_menu_separator_class = {
 
 const lv_obj_class_t lv_menu_sidebar_cont_class = {
     .base_class = &lv_obj_class,
+    .name = "lv_menu_sidebar",
 };
 
 const lv_obj_class_t lv_menu_main_cont_class = {
     .base_class = &lv_obj_class,
+    .name = "lv_menu_main_container",
 };
 
 const lv_obj_class_t lv_menu_main_header_cont_class = {
     .base_class = &lv_obj_class,
+    .name = "lv_menu_main_header",
 };
 
 const lv_obj_class_t lv_menu_sidebar_header_cont_class = {
     .base_class = &lv_obj_class,
+    .name = "lv_menu_sidebar_header",
 };
 
 static void lv_menu_refr(lv_obj_t * obj);
@@ -142,7 +146,13 @@ lv_obj_t * lv_menu_page_create(lv_obj_t * menu, char const * const title)
 
 lv_obj_t * lv_menu_cont_create(lv_obj_t * parent)
 {
-    LV_ASSERT_OBJ(parent, &lv_menu_page_class);
+    LV_ASSERT_NULL(parent);
+    if(!parent || (LV_USE_ASSERT_OBJ &&
+                   !(lv_obj_has_class(parent, &lv_menu_page_class)
+                     || lv_obj_has_class(parent, &lv_menu_section_class)))) {
+        LV_LOG_WARN("Invalid parent object type for menu container object");
+        return NULL;
+    }
 
     LV_LOG_INFO("begin");
     lv_obj_t * obj = lv_obj_class_create_obj(&lv_menu_cont_class, parent);

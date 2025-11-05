@@ -93,6 +93,7 @@ typedef enum {
     LV_EVENT_STYLE_CHANGED,       /**< Object's style has changed */
     LV_EVENT_LAYOUT_CHANGED,      /**< A child's position position has changed due to a layout recalculation */
     LV_EVENT_GET_SELF_SIZE,       /**< Get internal size of a widget */
+    LV_EVENT_UPDATE_LAYOUT_COMPLETED,    /**< Sent after layout update completes*/
 
     /** Events of optional LVGL components */
     LV_EVENT_INVALIDATE_AREA,     /**< An area is invalidated (marked for redraw). `lv_event_get_param(e)`
@@ -106,7 +107,7 @@ typedef enum {
     LV_EVENT_REFR_START,          /**< Sent before a refreshing cycle starts. Sent even if there is nothing to redraw. */
     LV_EVENT_REFR_READY,          /**< Sent when refreshing has been completed (after rendering and calling flush callback). Sent even if no redraw happened. */
     LV_EVENT_RENDER_START,        /**< Sent just before rendering begins. */
-    LV_EVENT_RENDER_READY,        /**< Sent after rendering has been completed (before calling flush callback) */
+    LV_EVENT_RENDER_READY,        /**< Sent after rendering has been completed. */
     LV_EVENT_FLUSH_START,         /**< Sent before flush callback is called. */
     LV_EVENT_FLUSH_FINISH,        /**< Sent after flush callback call has returned. */
     LV_EVENT_FLUSH_WAIT_START,    /**< Sent before flush wait callback is called. */
@@ -114,6 +115,9 @@ typedef enum {
 
     LV_EVENT_VSYNC,
     LV_EVENT_VSYNC_REQUEST,
+#if LV_USE_TRANSLATION
+    LV_EVENT_TRANSLATION_LANGUAGE_CHANGED, /**< Sent when the translation language changed. */
+#endif /*LV_USE_TRANSLATION*/
 
     LV_EVENT_LAST,                 /** Number of default events */
 
@@ -196,11 +200,26 @@ void * lv_event_get_user_data(lv_event_t * e);
 void lv_event_stop_bubbling(lv_event_t * e);
 
 /**
+ * Stop event from trickling down to children.
+ * This is only valid when called in the middle of an event processing chain.
+ * @param e     pointer to the event descriptor
+ */
+void lv_event_stop_trickling(lv_event_t * e);
+
+/**
  * Stop processing this event.
  * This is only valid when called in the middle of an event processing chain.
  * @param e     pointer to the event descriptor
  */
 void lv_event_stop_processing(lv_event_t * e);
+
+/**
+ * Helper function typically used in LV_EVENT_DELETE
+ * to free the event's user_data
+ * @param e     pointer to an event descriptor
+ */
+void lv_event_free_user_data_cb(lv_event_t * e);
+
 
 /**
  * Register a new, custom event ID.
