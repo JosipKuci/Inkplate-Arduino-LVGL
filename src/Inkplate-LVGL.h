@@ -23,11 +23,13 @@
 #include "Arduino.h"
 #include "SPI.h"
 #include "Wire.h"
+#include "lvgl/custom_allocation_algorithm.h"
 #include "boardSelect.h"
 #include "graphics/GraphicsDefs.h"
 #include "system/InkplateBoards.h"
 #include "system/NetworkController/NetworkController.h"
 #include "system/defines.h"
+
 
 void display_flush_callback(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map);
 

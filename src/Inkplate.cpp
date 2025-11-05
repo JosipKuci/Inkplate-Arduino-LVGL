@@ -46,11 +46,10 @@ void Inkplate::begin(lv_display_render_mode_t renderMode)
 
     _renderMode = renderMode;
 
-    // Init low level driver for EPD.
-    initDriver(this);
-
     initLVGL(renderMode);
 
+    // Init low level driver for EPD.
+    initDriver(this);
 
     // Forward the display mode to the EPD driver
     selectDisplayMode(_mode);
