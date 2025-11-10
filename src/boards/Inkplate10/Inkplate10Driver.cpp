@@ -1,6 +1,7 @@
 #ifdef ARDUINO_INKPLATE10V2
 #include "Inkplate10Driver.h"
 #include "Inkplate-LVGL.h"
+#include <EEPROM.h>
 
 
 SPIClass spi2(2);
@@ -125,6 +126,8 @@ int EPDDriver::initDriver(Inkplate *_inkplatePtr)
     // Initialize the all GPIOs
     gpioInit();
 
+    // Check waveform ID in EEPROM
+    checkWaveformID();
 
     if (!initializeFramebuffers())
     {
@@ -1035,5 +1038,71 @@ int8_t EPDDriver::readTemperature()
         delay(5);
     }
     return temp;
+}
+
+/**
+ * @brief       Function calculates checksum of wavefrom data read from EEPROM
+ *
+ * @param       struct waveformData _w
+ *              Structure for waveform data read from EEPROM. Struct can be found in Inkplate10Driver.h file
+ *
+ * @return      Value of checksum from data read from EEPROM
+ */
+uint8_t EPDDriver::calculateChecksum(struct waveformData _w)
+{
+    uint8_t *_d = (uint8_t *)&_w;
+    uint16_t _sum = 0;
+    int _n = sizeof(struct waveformData) - 1;
+
+    for (int i = 0; i < _n; i++)
+    {
+        _sum += _d[i];
+    }
+    return _sum % 256;
+}
+
+/**
+ * @brief       Function reads waveform data from EEPROM and checks it's validity.
+ *
+ * @param       struct waveformData *_w
+ *              Pointer to structure for waveform data read from EEPROM. Struct can be found in Inkplate10Driver.h file
+ *
+ * @return      True if data is vaild, false if not
+ */
+bool EPDDriver::getWaveformFromEEPROM(struct waveformData *_w)
+{
+    uint8_t *_ptr = (uint8_t *)_w;
+    for (int i = 0; i < sizeof(struct waveformData); i++)
+    {
+        _ptr[i] = EEPROM.read(i);
+    }
+
+    return (calculateChecksum(*_w) != _w->checksum) ? false : true;
+}
+
+
+/**
+ * @brief       checkWaveform function checks what waveform id was written into the EEPROM during factory programming,
+ *              if it is unable to identify it, it informs the user and sets the default waveform
+ */
+void EPDDriver::checkWaveformID()
+{
+    EEPROM.begin(512);
+
+    if (!getWaveformFromEEPROM(&waveformEEPROM) || waveformEEPROM.waveformId < INKPLATE10_WAVEFORM1 ||
+        waveformEEPROM.waveformId > INKPLATE10_WAVEFORM5)
+    {
+        Serial.println("Wavefrom load failed! Upload new waveform in EEPROM. Using default waveform.");
+        uint8_t defaultWaveform[8][9] = {{0, 0, 0, 0, 0, 0, 0, 1, 0}, {0, 0, 0, 2, 2, 2, 1, 1, 0},
+                                         {0, 0, 2, 1, 1, 2, 2, 1, 0}, {0, 1, 2, 2, 1, 2, 2, 1, 0},
+                                         {0, 0, 2, 1, 2, 2, 2, 1, 0}, {0, 2, 2, 2, 2, 2, 2, 1, 0},
+                                         {0, 0, 0, 0, 0, 2, 1, 2, 0}, {0, 0, 0, 2, 2, 2, 2, 2, 0}};
+        memcpy(waveform3Bit, defaultWaveform, sizeof(waveform3Bit));
+    }
+    else
+    {
+        memcpy(waveform3Bit, waveformEEPROM.waveform, sizeof(waveform3Bit));
+    }
+
 }
 #endif

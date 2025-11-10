@@ -80,6 +80,20 @@ class EPDDriver
 
 
   private:
+    struct waveformData
+    {
+        uint8_t header = 'W';
+        uint8_t waveformId;
+        uint8_t waveform[8][9];
+        uint8_t temp = 20;
+        uint8_t checksum;
+    };
+
+    struct waveformData waveformEEPROM;
+
+    void checkWaveformID();
+    uint8_t calculateChecksum(struct waveformData _w);
+    bool getWaveformFromEEPROM(struct waveformData *_w);
     void calculateLUTs();
     void pmicBegin();
     uint8_t initializeFramebuffers();
