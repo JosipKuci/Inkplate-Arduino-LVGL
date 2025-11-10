@@ -31,8 +31,13 @@
 #define INKPLATE10_WAVEFORM5    24
 #define INKPLATE6PLUS_WAVEFORM1 40
 
+#if !defined(ARDUINO_INKPLATECOLOR) && !defined(ARDUINO_INKPLATE2)
 #define BLACK 1
 #define WHITE 0
+#else
+#define BLACK 0
+#define WHITE 1
+#endif
 
 #define INKPLATE_1BIT          0
 #define INKPLATE_3BIT          1
