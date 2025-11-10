@@ -19,10 +19,16 @@
 
 #include "Inkplate-LVGL.h"
 
+#ifndef USE_COLOR_IMAGE
 Inkplate::Inkplate(uint8_t mode) 
 {
     _mode = mode;
 }
+#else
+Inkplate::Inkplate() 
+{
+}
+#endif
 
 /**
  *
@@ -35,7 +41,6 @@ Inkplate::Inkplate(uint8_t mode)
  */
 void Inkplate::begin(lv_display_render_mode_t renderMode)
 {
-
     // Check if the initializaton of the library already done.
     // In the case of already initialized library, return form the begin() funtion to
     // avoiid any memory leaks, multiple initializaton of the peripherals etc.
@@ -52,7 +57,9 @@ void Inkplate::begin(lv_display_render_mode_t renderMode)
     initDriver(this);
 
     // Forward the display mode to the EPD driver
+    #ifndef USE_COLOR_IMAGE
     selectDisplayMode(_mode);
+    #endif
 
     // Clean frame buffers.
     clearDisplay();
@@ -114,23 +121,28 @@ void Inkplate::initLVGL(lv_display_render_mode_t renderMode)
     lv_init();
 
     // Define display resolution
+    #ifndef ARDUINO_INKPLATE2
     uint32_t screen_width = E_INK_WIDTH;
     uint32_t screen_height = E_INK_HEIGHT;
+    #else
+    uint32_t screen_width = E_INK_HEIGHT;
+    uint32_t screen_height = E_INK_WIDTH;
+    #endif
     uint32_t buffer_size;
     lv_color_t* buf_1;
     lv_color_t* buf_2;
 
     if(renderMode == LV_DISPLAY_RENDER_MODE_PARTIAL){
         #define PARTIAL_ROWS 16
-        buf_1=(lv_color_t*)heap_caps_malloc( screen_width * PARTIAL_ROWS, MALLOC_CAP_8BIT );
-        buf_2= (lv_color_t*)heap_caps_malloc( screen_width * PARTIAL_ROWS, MALLOC_CAP_8BIT );
-        buffer_size = screen_width*PARTIAL_ROWS;
+        buf_1=(lv_color_t*)heap_caps_malloc( screen_width * PARTIAL_ROWS * (LV_COLOR_DEPTH / 8) , MALLOC_CAP_8BIT );
+        buf_2= (lv_color_t*)heap_caps_malloc( screen_width * PARTIAL_ROWS * (LV_COLOR_DEPTH / 8), MALLOC_CAP_8BIT );
+        buffer_size = screen_width*PARTIAL_ROWS*(LV_COLOR_DEPTH / 8);
     }
     else
     {
-        buf_1=(lv_color_t*)heap_caps_malloc( screen_width * screen_height, MALLOC_CAP_8BIT );
-        buf_2= (lv_color_t*)heap_caps_malloc( screen_width * screen_height, MALLOC_CAP_8BIT );
-        buffer_size = screen_width*screen_height;
+        buf_1=(lv_color_t*)heap_caps_malloc( screen_width * screen_height * (LV_COLOR_DEPTH / 8), MALLOC_CAP_8BIT );
+        buf_2= (lv_color_t*)heap_caps_malloc( screen_width * screen_height * (LV_COLOR_DEPTH / 8), MALLOC_CAP_8BIT );
+        buffer_size = screen_width*screen_height*(LV_COLOR_DEPTH / 8);
     }
 
     // Create a display driver instance
@@ -143,7 +155,11 @@ void Inkplate::initLVGL(lv_display_render_mode_t renderMode)
     lv_display_set_default(disp);
 
     // Use 8-bit grayscale
+    #ifdef USE_COLOR_IMAGE
+    lv_display_set_color_format(disp, LV_COLOR_FORMAT_RGB565);
+    #else
     lv_display_set_color_format(disp, LV_COLOR_FORMAT_L8);
+    #endif
 
 
     // Attach the buffer
@@ -160,6 +176,11 @@ void Inkplate::initLVGL(lv_display_render_mode_t renderMode)
 
     // Set flush callback
     lv_display_set_flush_cb(disp, display_flush_callback);
+
+    // Inkplate 2 doesn't have an SD Card reader
+    #ifndef ARDUINO_INKPLATE2
+    lv_fs_init_sd();
+    #endif
 
     Serial.println("LVGL initialization complete");
     
