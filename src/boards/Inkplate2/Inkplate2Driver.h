@@ -20,7 +20,7 @@
 
 #include "../../system/defines.h"
 
-#include "../../graphics/dithering/ditherAlgorithm.h"
+#include "../../graphics/ditheringColor/ditherAlgorithm.h"
 
 class Inkplate;
 
