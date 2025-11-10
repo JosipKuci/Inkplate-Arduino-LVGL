@@ -8,7 +8,21 @@ SdFat sd(&spi2);
 
 
 
-
+/**
+ * @brief       display_flush_callback function is called whenever there is a change made on the current 
+ *              LVGL screen. The data is downscaled to 3 bit or 1 bit grayscale depending on the current display mode
+ *              and stored in the EPD buffer for rendering
+ *
+ * @param       lv_display_t *disp
+ *              A pointer to the created LVGL display instance
+ * 
+ * @param       lv_area_t *area
+ *              A pointer to the area of the display which has changed
+ * 
+ * @param       uint8_t px_map
+ *              An array of pixel values in L8 format
+ * 
+ */
 void IRAM_ATTR display_flush_callback(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
 {
     Inkplate *self = static_cast<Inkplate *>(lv_display_get_user_data(disp));
@@ -23,7 +37,7 @@ void IRAM_ATTR display_flush_callback(lv_display_t *disp, const lv_area_t *area,
         lv_display_flush_ready(disp);
         return;
     }
-
+    
     bool is3bit = (self->getDisplayMode() == INKPLATE_3BIT);
 
     uint8_t *buffer1b = self->_partial;
@@ -96,10 +110,9 @@ void IRAM_ATTR display_flush_callback(lv_display_t *disp, const lv_area_t *area,
  * @brief       begin function initialize Inkplate object with predefined
  * settings
  *
- * @param       uint8_t lightWaveform
- *              if inkplate doesn't work well or if it is fading after turning off
- *              lightWaveform should be set to 1 in order to fix that, but older boards
- *              may not support it
+ * @param       Inkplate _inkplatePtr
+ *              A pointer to the created Inkplate instance which will be used by subclasses
+ *              to use internal inkplate functions
  *
  * @return      True if initialization is successful, false if failed or already
  * initialized
