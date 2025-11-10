@@ -24,6 +24,16 @@
 #define USES_I2S
 #define MULTIPLE_DISPLAY_MODES
 #include "boards/Inkplate6FLICK/Inkplate6FLICKBoardFile.h"
+#elif defined(ARDUINO_INKPLATE5V2)
+#define USES_I2S
+#define MULTIPLE_DISPLAY_MODES
+#include "boards/Inkplate5V2/Inkplate5V2BoardFile.h"
+#elif defined(ARDUINO_INKPLATECOLOR)
+#define USE_COLOR_IMAGE
+#include "boards/Inkplate6COLOR/Inkplate6COLORBoardFile.h"
+#elif defined(ARDUINO_INKPLATE2)
+#define USE_COLOR_IMAGE
+#include "boards/Inkplate2/Inkplate2BoardFile.h"
 #else
 #error "Board not selected!"
 #endif
