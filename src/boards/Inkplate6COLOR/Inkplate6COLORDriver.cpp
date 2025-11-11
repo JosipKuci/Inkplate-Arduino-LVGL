@@ -58,7 +58,7 @@ void EPDDriver::writePixelInternal(int16_t x, int16_t y, uint16_t color)
 
 /**
  * @brief       display_flush_callback function is called whenever there is a change made on the current 
- *              LVGL screen. The data is downscaled to 3 bit or 1 bit grayscale depending on the current display mode
+ *              LVGL screen. The data is downscaled to a 3-bit color palette from RGB565
  *              and stored in the EPD buffer for rendering
  *
  * @param       lv_display_t *disp
