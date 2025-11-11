@@ -1,5 +1,7 @@
 #pragma once
 
+#ifdef USE_COLOR_IMAGE
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -36,3 +38,4 @@ class DitherAlgorithm{
 
 };
 
+#endif

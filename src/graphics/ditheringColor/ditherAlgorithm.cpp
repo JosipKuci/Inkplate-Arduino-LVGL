@@ -1,6 +1,7 @@
 #include "ditherAlgorithm.h"
 #include "Inkplate-LVGL.h"
 
+#ifdef USE_COLOR_IMAGE
 
 // RGB565 to RGBTRIPLE
 void DitherAlgorithm::RGB565_to_RGBtriple(uint16_t c, uint8_t *r, uint8_t *g, uint8_t *b)
@@ -380,3 +381,5 @@ void DitherAlgorithm::ditherFramebuffer(uint8_t* frameBuffer, int width, int hei
     free(pixels);
     return;
 }
+
+#endif
