@@ -26,6 +26,8 @@
 
 #include "../../system/defines.h"
 
+#include "../../graphics/ditheringGrayscale/ditherAlgorithm.h"
+
 
 class Inkplate;
 
@@ -60,6 +62,8 @@ class EPDDriver
     IOExpander externalIO;
 
     RTC rtc;
+
+    DitherAlgorithm dither;
 
     uint8_t _beginDone = 0;
     uint8_t _displayMode;

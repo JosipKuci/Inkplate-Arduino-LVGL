@@ -28,6 +28,7 @@
 
 #include "../../system/esp32/Esp.h"
 
+#include "../../graphics/ditheringGrayscale/ditherAlgorithm.h"
 
 class Inkplate;
 
@@ -57,6 +58,7 @@ class EPDDriver : public Esp
 
     double readBattery();
 
+    DitherAlgorithm dither;
 
     IOExpander internalIO;
     IOExpander externalIO;

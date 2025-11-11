@@ -28,6 +28,8 @@
 
 #include "../../system/esp32/Esp.h"
 
+#include "../../graphics/ditheringGrayscale/ditherAlgorithm.h"
+
 
 class Inkplate;
 
@@ -61,6 +63,8 @@ class EPDDriver : public Esp
     IOExpander internalIO;
 
     RTC rtc;
+
+    DitherAlgorithm dither;
 
     uint8_t _beginDone = 0;
     uint8_t _displayMode;

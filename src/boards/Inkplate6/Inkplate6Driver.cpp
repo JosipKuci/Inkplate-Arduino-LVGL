@@ -6,6 +6,78 @@
 SPIClass spi2(2);
 SdFat sd(&spi2);
 
+/**
+ *
+ * @brief       writePixelInternal funtion sets pixel data for (x, y) pixel position
+ *
+ * @param       int16_t x0
+ *              default position for x, will be changed depending on rotation
+ * @param       int16_t y0
+ *              default position for y, will be changed depending on rotation
+ * @param       uint16_t color
+ *              pixel color, in 3bit mode have values in range 0-7
+ *
+ * @note        If x0 or y0 are out of inkplate screen borders, function will
+ * exit.
+ */
+void EPDDriver::writePixelInternal(int16_t x, int16_t y, uint16_t color)
+{
+    int16_t x0 = x;
+    int16_t y0 = y;
+    if (x0 > E_INK_WIDTH - 1 || y0 > E_INK_HEIGHT - 1 || x0 < 0 || y0 < 0)
+        return;
+
+    // set x, y depending on selected rotation
+    switch (_inkplate->getRotation())
+    {
+    case 1: // 90 degree left
+        _swap_int16_t(x0, y0);
+        x0 = E_INK_HEIGHT - x0 - 1;
+        break;
+    case 2: // 180 degree, or upside down
+        x0 = E_INK_WIDTH - x0 - 1;
+        y0 = E_INK_HEIGHT - y0 - 1;
+        break;
+    case 3: // 90 degree right
+        _swap_int16_t(x0, y0);
+        y0 = E_INK_WIDTH - y0 - 1;
+        break;
+    }
+
+    // If the 1 bit mode is used, pixels are packed 1 bit = 1 pixel in frame buffer
+    if (getDisplayMode() == 0)
+    {
+        // Divide by 8 to find a byte.
+        int x = x0 >> 3;
+
+        // Get the remainder of the division to find a exact bit in the byte that needs to be modified.
+        int x_sub = x0 & 7;
+
+        // Save the currnet state of the byte in the frame buffer.
+        uint8_t temp = *(_partial + (E_INK_WIDTH / 8) * y0 + x);
+
+        // Modify the pixel. First clear the pixel by writing zero then write the 1 if the pixel is set.
+        *(_partial + (E_INK_WIDTH / 8) * y0 + x) = (~pixelMaskLUT[x_sub] & temp) | (color ? pixelMaskLUT[x_sub] : 0);
+    }
+    else
+    {
+        // If 3 bit mode is used, constrain the color value (only 8 possible colors are available).
+        color &= 7;
+
+        // Divide by two to find a byte
+        int x = x0 >> 1;
+
+        //  Get the remainder of the division to find if the lower or upper 4 bits are needed.
+        int x_sub = x0 & 1;
+
+        // Store the current value of the byte.
+        uint8_t temp;
+        temp = *(DMemory4Bit + (E_INK_WIDTH / 2) * y0 + x);
+
+        // Modify the specific pixel by writing all zeros into lower or upper 4 bits and set the needed color.
+        *(DMemory4Bit + (E_INK_WIDTH / 2) * y0 + x) = (pixelMaskGLUT[x_sub] & temp) | (x_sub ? color : color << 4);
+    }
+}
 
 
 /**
@@ -40,62 +112,69 @@ void IRAM_ATTR display_flush_callback(lv_display_t *disp, const lv_area_t *area,
     
     bool is3bit = (self->getDisplayMode() == INKPLATE_3BIT);
 
-    uint8_t *buffer1b = self->_partial;
-    uint8_t *buffer3b = self->DMemory4Bit;
-
-    const int width_bytes_1b = E_INK_WIDTH / 8;
-    const int width_bytes_3b = E_INK_WIDTH / 2;
-
-    // Preload LUTs to local for faster access
-    const uint8_t *maskLUT  = pixelMaskLUT;
-    const uint8_t *maskGLUT = pixelMaskGLUT;
-
-    for (int32_t y = 0; y < h; y++)
+    if(self->ditherEnabled)
     {
-        int32_t screen_y = area->y1 + y;
-        const uint8_t *src_row = px_map + (y * w);
+        self->dither.ditherFramebuffer(px_map, E_INK_WIDTH, E_INK_HEIGHT, is3bit);
+    }
+    else
+    {
+        uint8_t *buffer1b = self->_partial;
+        uint8_t *buffer3b = self->DMemory4Bit;
 
-        if (is3bit)
+        const int width_bytes_1b = E_INK_WIDTH / 8;
+        const int width_bytes_3b = E_INK_WIDTH / 2;
+
+        // Preload LUTs to local for faster access
+        const uint8_t *maskLUT  = pixelMaskLUT;
+        const uint8_t *maskGLUT = pixelMaskGLUT;
+
+        for (int32_t y = 0; y < h; y++)
         {
-            uint8_t *dst_row = buffer3b + (width_bytes_3b * screen_y);
+            int32_t screen_y = area->y1 + y;
+            const uint8_t *src_row = px_map + (y * w);
 
-            for (int32_t x = 0; x < w; x++)
+            if (is3bit)
             {
-                int32_t screen_x = area->x1 + x;
-                if (screen_x >= E_INK_WIDTH) break;
+                uint8_t *dst_row = buffer3b + (width_bytes_3b * screen_y);
 
-                uint8_t gray3 = src_row[x] >> 5;
-                int x_byte = screen_x / 2;
-                int x_sub  = screen_x % 2;
+                for (int32_t x = 0; x < w; x++)
+                {
+                    int32_t screen_x = area->x1 + x;
+                    if (screen_x >= E_INK_WIDTH) break;
 
-                uint8_t temp = dst_row[x_byte];
-                uint8_t newv = (maskGLUT[x_sub] & temp) |
-                               (x_sub ? gray3 : (gray3 << 4));
+                    uint8_t gray3 = src_row[x] >> 5;
+                    int x_byte = screen_x / 2;
+                    int x_sub  = screen_x % 2;
 
-                dst_row[x_byte] = newv;
+                    uint8_t temp = dst_row[x_byte];
+                    uint8_t newv = (maskGLUT[x_sub] & temp) |
+                                (x_sub ? gray3 : (gray3 << 4));
+
+                    dst_row[x_byte] = newv;
+                }
             }
-        }
-        else
-        {
-            uint8_t *dst_row = buffer1b + (width_bytes_1b * screen_y);
-
-            for (int32_t x = 0; x < w; x++)
+            else
             {
-                int32_t screen_x = area->x1 + x;
-                if (screen_x >= E_INK_WIDTH) break;
+                uint8_t *dst_row = buffer1b + (width_bytes_1b * screen_y);
 
-                uint8_t gray = src_row[x];
-                uint8_t bit = (gray < 128) ? 1 : 0;
+                for (int32_t x = 0; x < w; x++)
+                {
+                    int32_t screen_x = area->x1 + x;
+                    if (screen_x >= E_INK_WIDTH) break;
 
-                int x_byte = screen_x / 8;
-                int x_sub  = screen_x % 8;
+                    uint8_t gray = src_row[x];
+                    uint8_t bit = (gray < 128) ? 1 : 0;
 
-                uint8_t temp = dst_row[x_byte];
-                // Preserve other bits using original mask logic
-                dst_row[x_byte] = (~maskLUT[x_sub] & temp) |
-                                  (bit ? maskLUT[x_sub] : 0);
+                    int x_byte = screen_x / 8;
+                    int x_sub  = screen_x % 8;
+
+                    uint8_t temp = dst_row[x_byte];
+                    // Preserve other bits using original mask logic
+                    dst_row[x_byte] = (~maskLUT[x_sub] & temp) |
+                                    (bit ? maskLUT[x_sub] : 0);
+                }
             }
-        }
+    }
     }
 
     lv_display_flush_ready(disp);
@@ -143,6 +222,8 @@ int EPDDriver::initDriver(Inkplate *_inkplatePtr)
     {
         return 0;
     }
+
+    dither.begin(_inkplatePtr);
 
     // Init the I2S driver. It will setup a I2S driver.
     I2SInit(myI2S);
@@ -685,7 +766,7 @@ void EPDDriver::einkOff()
 void EPDDriver::pmicBegin()
 {
     WAKEUP_SET;
-    delay(1);
+    delay(5);
     Wire.beginTransmission(0x48);
     Wire.write(0x09);
     Wire.write(0B00011011); // Power up seq.
@@ -693,7 +774,7 @@ void EPDDriver::pmicBegin()
     Wire.write(0B00011011); // Power down seq.
     Wire.write(0B00000000); // Power down delay (6mS per rail)
     Wire.endTransmission();
-    delay(1);
+    delay(5);
     WAKEUP_CLEAR;
 }
 
