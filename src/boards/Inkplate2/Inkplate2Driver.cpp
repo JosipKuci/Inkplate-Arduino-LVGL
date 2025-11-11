@@ -43,9 +43,19 @@ void EPDDriver::writePixelInternal(int16_t x0, int16_t y0, uint16_t color)
 
 
 /**
- * @brief LVGL flush callback for 3-color (black/white/red) Inkplate (L8 mode).
- *        Converts grayscale to black/white/red and uses writePixelInternal()
- *        for correct rotation and memory addressing.
+ * @brief       display_flush_callback function is called whenever there is a change made on the current 
+ *              LVGL screen. The data is downscaled to a White-Black-Red color palette from RGB565
+ *              and stored in the EPD buffer for rendering
+ *
+ * @param       lv_display_t *disp
+ *              A pointer to the created LVGL display instance
+ * 
+ * @param       lv_area_t *area
+ *              A pointer to the area of the display which has changed
+ * 
+ * @param       uint8_t px_map
+ *              An array of pixel values in L8 format
+ * 
  */
 void IRAM_ATTR display_flush_callback(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
 {
@@ -58,44 +68,44 @@ void IRAM_ATTR display_flush_callback(lv_display_t *disp, const lv_area_t *area,
     {
         self->dither.ditherFramebuffer(px_map, E_INK_HEIGHT, E_INK_WIDTH);
     }
-else
-{
-    const uint8_t *src8 = px_map;
-
-    for (int32_t y = 0; y < h; y++)
+    else
     {
-        const uint8_t *src_row = src8 + (y * w * 2); // 2 bytes per pixel
+        const uint8_t *src8 = px_map;
 
-        for (int32_t x = 0; x < w; x++)
+        for (int32_t y = 0; y < h; y++)
         {
-            // Read 16-bit pixel (RGB565)
-            uint16_t pixel = src_row[x * 2] | (src_row[x * 2 + 1] << 8);
+            const uint8_t *src_row = src8 + (y * w * 2); // 2 bytes per pixel
 
-            // Extract RGB components
-            uint8_t r = (pixel >> 11) & 0x1F;
-            uint8_t g = (pixel >> 5) & 0x3F;
-            uint8_t b = pixel & 0x1F;
+            for (int32_t x = 0; x < w; x++)
+            {
+                // Read 16-bit pixel (RGB565)
+                uint16_t pixel = src_row[x * 2] | (src_row[x * 2 + 1] << 8);
 
-            // Scale up to 8-bit per channel
-            r = (r * 255) / 31;
-            g = (g * 255) / 63;
-            b = (b * 255) / 31;
+                // Extract RGB components
+                uint8_t r = (pixel >> 11) & 0x1F;
+                uint8_t g = (pixel >> 5) & 0x3F;
+                uint8_t b = pixel & 0x1F;
 
-            // Convert to brightness
-            uint8_t gray = (uint8_t)((r * 0.299f) + (g * 0.587f) + (b * 0.114f));
+                // Scale up to 8-bit per channel
+                r = (r * 255) / 31;
+                g = (g * 255) / 63;
+                b = (b * 255) / 31;
 
-            uint16_t color;
-            if (gray < 85)
-                color = 1; // Black
-            else if (gray > 180)
-                color = 0; // Red
-            else
-                color = 2; // White
+                // Convert to brightness
+                uint8_t gray = (uint8_t)((r * 0.299f) + (g * 0.587f) + (b * 0.114f));
 
-            self->writePixelInternal(area->x1 + x, area->y1 + y, color);
+                uint16_t color;
+                if (gray < 85)
+                    color = 1; // Black
+                else if (gray > 180)
+                    color = 0; // Red
+                else
+                    color = 2; // White
+
+                self->writePixelInternal(area->x1 + x, area->y1 + y, color);
+            }
         }
     }
-}
     lv_display_flush_ready(disp);
 }
 
